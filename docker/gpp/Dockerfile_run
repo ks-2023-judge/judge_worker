@@ -1,0 +1,3 @@
+from gcc:13
+
+entrypoint ["/judge/answer"]

@@ -1,0 +1,3 @@
+from openjdk:21
+
+entrypoint ["javac", "-J-Xms1024m", "-J-Xmx1920m", "-J-Xss512m", "-encoding", "UTF-8", "/judge/Answer.java"]

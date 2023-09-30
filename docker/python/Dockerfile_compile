@@ -1,0 +1,3 @@
+from python:3.11
+
+entrypoint ["python" "-m", "py_compile", "/judge/Answer.py"]

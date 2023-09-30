@@ -1,0 +1,3 @@
+from node:20
+
+entrypoint ["node", "--stack-size=65536", "/judge/Answer.js"]

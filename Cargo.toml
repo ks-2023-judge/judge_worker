@@ -1,0 +1,16 @@
+[package]
+name = "judge_worker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "*", features = ['full']}
+mysql_async = "*"
+bytes = "*"
+rand = "*"
+toml = "*"
+nix = { version = "*", features=['process', 'resource', 'process'] }
+libc = "*"
+caps = "*"

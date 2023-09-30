@@ -1,0 +1,8 @@
+server_ip = "127.0.0.1"
+server_port = 33333
+
+is_precise = false
+cpu_scale = 1.0
+
+
+affinity_core = [2,3]

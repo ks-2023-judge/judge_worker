@@ -1,0 +1,3 @@
+from gcc:13
+
+entrypoint ["gcc", "/judge/answer.c", "-o", "/judge/answer", "-O2", "-Wall", "-lm", "-static", "-std=gnu++17"]
