@@ -305,6 +305,7 @@ pub enum TestCaseJudgeResultInner {
     WrongAnswer,
     OutputLimitExceeded,
     CompileFailed,
+    RuntimeError,
 }
 impl ToString for TestCaseJudgeResultInner {
     fn to_string(&self) -> String {
@@ -316,6 +317,7 @@ impl ToString for TestCaseJudgeResultInner {
             Self::MemoryLimitExceeded => "메모리 초과".to_string(),
             Self::OutputLimitExceeded => "출력 초과".to_string(),
             Self::CompileFailed => "컴파일 실패".to_string(),
+            Self::RuntimeError => "런타임 오류".to_string(),
         }
     }
 }
@@ -329,6 +331,7 @@ impl From<TestCaseJudgeResultInner> for String {
             TestCaseJudgeResultInner::MemoryLimitExceeded => "MemoryLimitExceeded".to_string(),
             TestCaseJudgeResultInner::OutputLimitExceeded => "OutputLimitExceeded".to_string(),
             TestCaseJudgeResultInner::CompileFailed => "CompileFailed".to_string(),
+            TestCaseJudgeResultInner::RuntimeError => "RunTimeError".to_string(),
         }
     }
 }
@@ -342,6 +345,7 @@ impl From<String> for TestCaseJudgeResultInner {
             "MemoryLimitExceeded" => TestCaseJudgeResultInner::MemoryLimitExceeded,
             "OutputLimitExceeded" => TestCaseJudgeResultInner::OutputLimitExceeded,
             "CompileFailed" => TestCaseJudgeResultInner::CompileFailed,
+            "RunTimeError" => TestCaseJudgeResultInner::RuntimeError,
             _ => panic!("Invalid TestCaseJudgeResultInner"),
         }
     }

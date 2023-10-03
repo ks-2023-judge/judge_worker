@@ -5,4 +5,4 @@ is_precise = false
 cpu_scale = 1.0
 
 
-affinity_core = [2,3]
+affinity_core = [1,2,3]

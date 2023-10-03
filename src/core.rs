@@ -169,7 +169,7 @@ impl Core {
         lang: SubmissionLanguage,
         code: String,
         input: String,
-        output: String,
+        expect_output: String,
         max_time: u64,
         max_memory: u64,
     ) -> Result<MsgResult, Errno> {
@@ -207,6 +207,7 @@ impl Core {
                 &format!("{}:/judge", dir_target),
                 "-w",
                 "/judge",
+                "--rm",
                 &format!("--cpuset-cpus={}", self.config.affintiy),
                 &format!("{}_compile", <String>::from(lang)),
             ])
@@ -225,16 +226,7 @@ impl Core {
             tokio::select! {
                 recv_len = cmd_compile_stdout.read_buf(&mut output_buf) => {
                     match recv_len {
-                        Ok(0) | Err(_) => {
-                            if let Ok(Some(exit)) = cmd_compile.try_wait() {
-                                if !exit.success() {
-                                    result_form.result = TestCaseJudgeResultInner::CompileFailed;
-                                    return Ok(result_form);
-                                } else {
-                                    break;
-                                }
-                            }
-                        },
+                        Ok(0) | Err(_) => break,
                         _ => (),
                     }
 
@@ -255,16 +247,7 @@ impl Core {
                 }
                 recv_len = cmd_compile_stderr.read_buf(&mut error_buf) => {
                      match recv_len {
-                        Ok(0) | Err(_) => {
-                            if let Ok(Some(exit)) = cmd_compile.try_wait() {
-                                if !exit.success() {
-                                    result_form.result = TestCaseJudgeResultInner::CompileFailed;
-                                    return Ok(result_form);
-                                } else {
-                                    break;
-                                }
-                            }
-                        },
+                        Ok(0) | Err(_) => break,
                         _ => (),
                     }
 
@@ -301,7 +284,12 @@ impl Core {
             }
         }
 
-        println!("output {:?}", result_form);
+        if let Ok(Some(v)) = cmd_compile.try_wait() {
+            if !v.success() {
+                result_form.result = TestCaseJudgeResultInner::CompileFailed;
+                return Ok(result_form);
+            }
+        }
 
         output_buf.clear();
         error_buf.clear();
@@ -313,6 +301,7 @@ impl Core {
                 &format!("{}:/judge", dir_target),
                 "-w",
                 "/judge",
+                "--rm",
                 "-m",
                 "2G",
                 "--memory-reservation",
@@ -332,8 +321,8 @@ impl Core {
 
         let start_time = std::time::Instant::now();
 
-        run_stdin.write_all(input.as_bytes()).await.unwrap();
-        run_stdin.flush().await.unwrap();
+        run_stdin.write_all(input.as_bytes()).await;
+        run_stdin.flush().await;
 
         loop {
             tokio::select! {
@@ -357,7 +346,7 @@ impl Core {
                         }
                     }
 
-                    if result_form.output_run.len() > 16384 {
+                    if result_form.output_run.len() > max(expect_output.len() + 256, 16384) {
                         result_form.result = TestCaseJudgeResultInner::OutputLimitExceeded;
                         return Ok(result_form);
                     }
@@ -383,7 +372,7 @@ impl Core {
                     }
 
 
-                    if result_form.output_run.len() > 16384 {
+                    if result_form.output_run.len() > max(expect_output.len() + 256, 16384) {
                         result_form.result = TestCaseJudgeResultInner::OutputLimitExceeded;
                         return Ok(result_form);
                     }
@@ -401,13 +390,14 @@ impl Core {
             return Ok(result_form);
         }
 
-        let result = cmd_compile.try_wait().unwrap().unwrap();
-        if !result.success() {
-            result_form.result = TestCaseJudgeResultInner::WrongAnswer;
-            return Ok(result_form);
+        if let Some(result) = cmd_run.try_wait().unwrap() {
+            if !result.success() {
+                result_form.result = TestCaseJudgeResultInner::RuntimeError;
+                return Ok(result_form);
+            }
         }
 
-        if result_form.output_run != output {
+        if result_form.output_run != expect_output {
             result_form.result = TestCaseJudgeResultInner::WrongAnswer;
             return Ok(result_form);
         }
@@ -455,5 +445,13 @@ impl Core {
         // }
 
         Ok(result_form)
+    }
+}
+
+fn max(a: usize, b: usize) -> usize {
+    if a < b {
+        b
+    } else {
+        a
     }
 }
