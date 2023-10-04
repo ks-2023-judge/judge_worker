@@ -331,84 +331,99 @@ impl Core {
             .unwrap();
 
         let mut run_stdin = cmd_run.stdin.take().unwrap();
-        let mut run_stdout = cmd_run.stdout.take().unwrap();
-        let mut run_stderr = cmd_run.stderr.take().unwrap();
+        let _run_stdout = cmd_run.stdout.take().unwrap();
+        let _run_stderr = cmd_run.stderr.take().unwrap();
 
         let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_millis(max(max_time, 30_000));
 
         run_stdin.write_all(input.as_bytes()).await;
         run_stdin.flush().await;
 
-        let mut max_time_limit = tokio::time::interval(std::time::Duration::from_millis(max(
-            max_time, 30_000,
-        )
-            as u64));
+        match tokio::time::timeout(timeout, cmd_run.wait_with_output()).await {
+            Err(_) => {
+                result_form.result = TestCaseJudgeResultInner::TimeLimitExceeded;
+                return Ok(result_form);
+            }
+            Ok(Ok(output)) => {
+                result_form.output_run = String::from_utf8_lossy(&output.stdout).to_string();
 
-        max_time_limit.tick().await;
-
-        loop {
-            tokio::select! {
-                recv_len = run_stdout.read_buf(&mut output_buf) => {
-                    match recv_len {
-                        Ok(0) | Err(_) => break,
-                        _ => ()
-                    };
-
-                    let mut cnt = output_buf.len();
-                    while cnt > 0 {
-                        match std::str::from_utf8(&output_buf[0..cnt]) {
-                            Ok(s) => {
-                                result_form.output_run.push_str(s);
-                                output_buf.advance(cnt);
-                                cnt = output_buf.len();
-                            }
-                            Err(_) => {
-                                cnt -= 1;
-                            }
-                        }
-                    }
-
-                    if result_form.output_run.len() > max(expect_output.len() + 256, 16384) {
-                        result_form.result = TestCaseJudgeResultInner::OutputLimitExceeded;
-                        return Ok(result_form);
-                    }
-                }
-                recv_len = run_stderr.read_buf(&mut error_buf) => {
-                    match recv_len {
-                        Ok(0) | Err(_) => break,
-                        _ => ()
-                    };
-
-                    let mut cnt = error_buf.len();
-                    while cnt > 0 {
-                        match std::str::from_utf8(&error_buf[0..cnt]) {
-                            Ok(s) => {
-                                result_form.output_run.push_str(s);
-                                error_buf.advance(cnt);
-                                cnt = error_buf.len();
-                            }
-                            Err(_) => {
-                                cnt -= 1;
-                            }
-                        }
-                    }
-
-
-                    if result_form.output_run.len() > max(expect_output.len() + 256, 16384) {
-                        result_form.result = TestCaseJudgeResultInner::OutputLimitExceeded;
-                        return Ok(result_form);
-                    }
-                }
-                _ = max_time_limit.tick() => {
-                    result_form.result = TestCaseJudgeResultInner::TimeLimitExceeded;
+                if !output.status.success() {
+                    result_form.result = TestCaseJudgeResultInner::RuntimeError;
                     return Ok(result_form);
                 }
             }
+            _ => {
+                result_form.result = TestCaseJudgeResultInner::RuntimeError;
+                return Ok(result_form);
+            }
         }
 
-        let stop = std::time::Instant::now();
-        let diff = stop.duration_since(start_time);
+        // let mut max_time_limit = tokio::time::interval(
+        //     as u64));
 
+        // max_time_limit.tick().await;
+
+        // loop {
+        //     tokio::select! {
+        //         recv_len = run_stdout.read_buf(&mut output_buf) => {
+        //             match recv_len {
+        //                 Ok(0) | Err(_) => break,
+        //                 _ => ()
+        //             };
+
+        //             let mut cnt = output_buf.len();
+        //             while cnt > 0 {
+        //                 match std::str::from_utf8(&output_buf[0..cnt]) {
+        //                     Ok(s) => {
+        //                         result_form.output_run.push_str(s);
+        //                         output_buf.advance(cnt);
+        //                         cnt = output_buf.len();
+        //                     }
+        //                     Err(_) => {
+        //                         cnt -= 1;
+        //                     }
+        //                 }
+        //             }
+
+        //             if result_form.output_run.len() > max(expect_output.len() + 256, 16384) {
+        //                 result_form.result = TestCaseJudgeResultInner::OutputLimitExceeded;
+        //                 return Ok(result_form);
+        //             }
+        //         }
+        //         recv_len = run_stderr.read_buf(&mut error_buf) => {
+        //             match recv_len {
+        //                 Ok(0) | Err(_) => break,
+        //                 _ => ()
+        //             };
+
+        //             let mut cnt = error_buf.len();
+        //             while cnt > 0 {
+        //                 match std::str::from_utf8(&error_buf[0..cnt]) {
+        //                     Ok(s) => {
+        //                         result_form.output_run.push_str(s);
+        //                         error_buf.advance(cnt);
+        //                         cnt = error_buf.len();
+        //                     }
+        //                     Err(_) => {
+        //                         cnt -= 1;
+        //                     }
+        //                 }
+        //             }
+
+        //             if result_form.output_run.len() > max(expect_output.len() + 256, 16384) {
+        //                 result_form.result = TestCaseJudgeResultInner::OutputLimitExceeded;
+        //                 return Ok(result_form);
+        //             }
+        //         }
+        //         _ = max_time_limit.tick() => {
+        //             result_form.result = TestCaseJudgeResultInner::TimeLimitExceeded;
+        //             return Ok(result_form);
+        //         }
+        //     }
+        // }
+
+        let diff = start_time.elapsed();
         result_form.time_used = diff.as_millis() as u64;
 
         if diff.as_millis() > max_time as u128 {
@@ -416,28 +431,28 @@ impl Core {
             return Ok(result_form);
         }
 
-        let mut max_try = 5;
-        loop {
-            match cmd_run.try_wait() {
-                Err(_) | Ok(None) => {
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        // let mut max_try = 5;
+        // loop {
+        //     match cmd_run.try_wait() {
+        //         Err(_) | Ok(None) => {
+        //             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-                    if max_try <= 0 {
-                        break;
-                    }
-                    max_try -= 1;
-                }
-                Ok(Some(v)) => {
-                    println!("exit result = {:?}", v);
-                    if !v.success() {
-                        result_form.result = TestCaseJudgeResultInner::RuntimeError;
-                        return Ok(result_form);
-                    }
+        //             if max_try <= 0 {
+        //                 break;
+        //             }
+        //             max_try -= 1;
+        //         }
+        //         Ok(Some(v)) => {
+        //             println!("exit result = {:?}", v);
+        //             if !v.success() {
+        //                 result_form.result = TestCaseJudgeResultInner::RuntimeError;
+        //                 return Ok(result_form);
+        //             }
 
-                    break;
-                }
-            }
-        }
+        //             break;
+        //         }
+        //     }
+        // }
 
         if result_form.output_run != expect_output {
             result_form.result = TestCaseJudgeResultInner::WrongAnswer;
