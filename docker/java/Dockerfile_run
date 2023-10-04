@@ -2,4 +2,4 @@ from openjdk:21
 
 WORKDIR /judge/
 RUN microdnf install time
-entrypoint ["/bin/bash", "-c", "/bin/time -o /judge/output_time -f \"%e %M\" java -Xms1024m -Xmx1920m -Xss512m -Dfile.encoding=UTF-8 -XX:+UseSerialGC -DONLINE_JUDGE=1 Answer < /judge/input > /judge/output_run"]
+entrypoint ["/bin/bash", "-c", "/bin/time -q -o /judge/output_time -f \"%e %M\" java -Xms1024m -Xmx1920m -Xss512m -Dfile.encoding=UTF-8 -XX:+UseSerialGC -DONLINE_JUDGE=1 Answer < /judge/input > /judge/output_run"]

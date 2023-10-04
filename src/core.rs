@@ -309,7 +309,12 @@ impl Core {
         output_buf.clear();
         error_buf.clear();
 
-        tokio::fs::write(format!("{}/input", dir_target), input).await;
+        tokio::fs::File::create(&format!("{}/input", dir_target))
+            .await
+            .unwrap();
+        if !input.is_empty() {
+            tokio::fs::write(format!("{}/input", dir_target), input).await;
+        }
 
         let start_estimate = std::time::Instant::now();
         let mut cmd_run = tokio::process::Command::new("docker")
@@ -336,9 +341,11 @@ impl Core {
         let time_estimated = start_estimate.elapsed();
 
         let output_time = tokio::fs::read_to_string(format!("{}/output_time", dir_target)).await;
-        if let Ok(out) = output_time {
+        if let Ok(out) = output_time.map(|s| s.replace('\n', "")) {
             let mut iter = out.split(' ');
             let (secs_float, memory_k) = (iter.next(), iter.next());
+
+            println!("secs_float {:?} {:?}", secs_float, memory_k);
 
             if let Some(sec) = secs_float.and_then(|v| v.parse::<f64>().ok()) {
                 result_form.time_used = (sec * 1000.0) as u64;

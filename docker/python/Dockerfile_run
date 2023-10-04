@@ -2,4 +2,4 @@ from python:3.11
 
 RUN apt update && apt install -y time
 
-entrypoint ["/bin/bash", "-c", "/bin/time -o /judge/output_time -f \"%e %M\" python /judge/Answer.py < /judge/input > /judge/output_run"]
+entrypoint ["/bin/bash", "-c", "/bin/time -q -o /judge/output_time -f \"%e %M\" python /judge/Answer.py < /judge/input > /judge/output_run"]
