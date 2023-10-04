@@ -284,10 +284,25 @@ impl Core {
             }
         }
 
-        if let Ok(Some(v)) = cmd_compile.try_wait() {
-            if !v.success() {
-                result_form.result = TestCaseJudgeResultInner::CompileFailed;
-                return Ok(result_form);
+        let mut max_try = 5;
+        loop {
+            match cmd_compile.try_wait() {
+                Err(_) | Ok(None) => {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+                    if max_try <= 0 {
+                        break;
+                    }
+                    max_try -= 1;
+                }
+                Ok(Some(v)) => {
+                    if !v.success() {
+                        result_form.result = TestCaseJudgeResultInner::CompileFailed;
+                        return Ok(result_form);
+                    }
+
+                    break;
+                }
             }
         }
 
@@ -323,6 +338,13 @@ impl Core {
 
         run_stdin.write_all(input.as_bytes()).await;
         run_stdin.flush().await;
+
+        let mut max_time_limit = tokio::time::interval(std::time::Duration::from_millis(max(
+            max_time, 30_000,
+        )
+            as u64));
+
+        max_time_limit.tick().await;
 
         loop {
             tokio::select! {
@@ -377,6 +399,10 @@ impl Core {
                         return Ok(result_form);
                     }
                 }
+                _ = max_time_limit.tick() => {
+                    result_form.result = TestCaseJudgeResultInner::TimeLimitExceeded;
+                    return Ok(result_form);
+                }
             }
         }
 
@@ -390,10 +416,26 @@ impl Core {
             return Ok(result_form);
         }
 
-        if let Some(result) = cmd_run.try_wait().unwrap() {
-            if !result.success() {
-                result_form.result = TestCaseJudgeResultInner::RuntimeError;
-                return Ok(result_form);
+        let mut max_try = 5;
+        loop {
+            match cmd_run.try_wait() {
+                Err(_) | Ok(None) => {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+                    if max_try <= 0 {
+                        break;
+                    }
+                    max_try -= 1;
+                }
+                Ok(Some(v)) => {
+                    println!("exit result = {:?}", v);
+                    if !v.success() {
+                        result_form.result = TestCaseJudgeResultInner::RuntimeError;
+                        return Ok(result_form);
+                    }
+
+                    break;
+                }
             }
         }
 
@@ -448,7 +490,10 @@ impl Core {
     }
 }
 
-fn max(a: usize, b: usize) -> usize {
+fn max<O>(a: O, b: O) -> O
+where
+    O: PartialOrd,
+{
     if a < b {
         b
     } else {
