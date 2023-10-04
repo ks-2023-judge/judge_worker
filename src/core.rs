@@ -309,6 +309,9 @@ impl Core {
         output_buf.clear();
         error_buf.clear();
 
+        tokio::fs::write(format!("{}/input", dir_target), input).await;
+
+        let start_estimate = std::time::Instant::now();
         let mut cmd_run = tokio::process::Command::new("docker")
             .args([
                 "run",
@@ -324,31 +327,47 @@ impl Core {
                 &format!("--cpuset-cpus={}", self.config.affintiy),
                 &format!("{}_run", <String>::from(lang)),
             ])
-            .stderr(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stdin(std::process::Stdio::piped())
             .spawn()
             .unwrap();
 
-        let mut run_stdin = cmd_run.stdin.take().unwrap();
-        let _run_stdout = cmd_run.stdout.take().unwrap();
-        let _run_stderr = cmd_run.stderr.take().unwrap();
+        let timeout = std::time::Duration::from_millis(max(max_time + 5_000, 30_000));
+        let exit_status = tokio::time::timeout(timeout, cmd_run.wait()).await;
 
-        let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_millis(max(max_time, 30_000));
+        let time_estimated = start_estimate.elapsed();
 
-        run_stdin.write_all(input.as_bytes()).await;
-        run_stdin.flush().await;
+        let output_time = tokio::fs::read_to_string(format!("{}/output_time", dir_target)).await;
+        if let Ok(out) = output_time {
+            let mut iter = out.split(' ');
+            let (secs_float, memory_k) = (iter.next(), iter.next());
 
-        match tokio::time::timeout(timeout, cmd_run.wait_with_output()).await {
+            if let Some(sec) = secs_float.and_then(|v| v.parse::<f64>().ok()) {
+                result_form.time_used = (sec * 1000.0) as u64;
+            } else {
+                result_form.time_used = time_estimated.as_millis() as u64;
+            }
+            if let Some(mem) = memory_k.and_then(|v| v.parse::<usize>().ok()) {
+                result_form.memory_used = mem as u64;
+            }
+        } else {
+            result_form.time_used = time_estimated.as_millis() as u64;
+        }
+
+        let output_run =
+            if let Ok(s) = tokio::fs::read_to_string(format!("{}/output_run", dir_target)).await {
+                s
+            } else {
+                String::from("ASCII / UTF-8이 아닌 문자열이 포함되어 있습니다.")
+            };
+
+        result_form.output_run = output_run;
+
+        match exit_status {
             Err(_) => {
                 result_form.result = TestCaseJudgeResultInner::TimeLimitExceeded;
                 return Ok(result_form);
             }
             Ok(Ok(output)) => {
-                result_form.output_run = String::from_utf8_lossy(&output.stdout).to_string();
-
-                if !output.status.success() {
+                if !output.success() {
                     result_form.result = TestCaseJudgeResultInner::RuntimeError;
                     return Ok(result_form);
                 }
@@ -359,100 +378,10 @@ impl Core {
             }
         }
 
-        // let mut max_time_limit = tokio::time::interval(
-        //     as u64));
-
-        // max_time_limit.tick().await;
-
-        // loop {
-        //     tokio::select! {
-        //         recv_len = run_stdout.read_buf(&mut output_buf) => {
-        //             match recv_len {
-        //                 Ok(0) | Err(_) => break,
-        //                 _ => ()
-        //             };
-
-        //             let mut cnt = output_buf.len();
-        //             while cnt > 0 {
-        //                 match std::str::from_utf8(&output_buf[0..cnt]) {
-        //                     Ok(s) => {
-        //                         result_form.output_run.push_str(s);
-        //                         output_buf.advance(cnt);
-        //                         cnt = output_buf.len();
-        //                     }
-        //                     Err(_) => {
-        //                         cnt -= 1;
-        //                     }
-        //                 }
-        //             }
-
-        //             if result_form.output_run.len() > max(expect_output.len() + 256, 16384) {
-        //                 result_form.result = TestCaseJudgeResultInner::OutputLimitExceeded;
-        //                 return Ok(result_form);
-        //             }
-        //         }
-        //         recv_len = run_stderr.read_buf(&mut error_buf) => {
-        //             match recv_len {
-        //                 Ok(0) | Err(_) => break,
-        //                 _ => ()
-        //             };
-
-        //             let mut cnt = error_buf.len();
-        //             while cnt > 0 {
-        //                 match std::str::from_utf8(&error_buf[0..cnt]) {
-        //                     Ok(s) => {
-        //                         result_form.output_run.push_str(s);
-        //                         error_buf.advance(cnt);
-        //                         cnt = error_buf.len();
-        //                     }
-        //                     Err(_) => {
-        //                         cnt -= 1;
-        //                     }
-        //                 }
-        //             }
-
-        //             if result_form.output_run.len() > max(expect_output.len() + 256, 16384) {
-        //                 result_form.result = TestCaseJudgeResultInner::OutputLimitExceeded;
-        //                 return Ok(result_form);
-        //             }
-        //         }
-        //         _ = max_time_limit.tick() => {
-        //             result_form.result = TestCaseJudgeResultInner::TimeLimitExceeded;
-        //             return Ok(result_form);
-        //         }
-        //     }
-        // }
-
-        let diff = start_time.elapsed();
-        result_form.time_used = diff.as_millis() as u64;
-
-        if diff.as_millis() > max_time as u128 {
+        if result_form.time_used > max_time {
             result_form.result = TestCaseJudgeResultInner::TimeLimitExceeded;
             return Ok(result_form);
         }
-
-        // let mut max_try = 5;
-        // loop {
-        //     match cmd_run.try_wait() {
-        //         Err(_) | Ok(None) => {
-        //             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-
-        //             if max_try <= 0 {
-        //                 break;
-        //             }
-        //             max_try -= 1;
-        //         }
-        //         Ok(Some(v)) => {
-        //             println!("exit result = {:?}", v);
-        //             if !v.success() {
-        //                 result_form.result = TestCaseJudgeResultInner::RuntimeError;
-        //                 return Ok(result_form);
-        //             }
-
-        //             break;
-        //         }
-        //     }
-        // }
 
         if result_form.output_run != expect_output {
             result_form.result = TestCaseJudgeResultInner::WrongAnswer;
@@ -460,46 +389,6 @@ impl Core {
         }
 
         result_form.result = TestCaseJudgeResultInner::Accepted;
-
-        // limit time with rlimit - cpu. the secs is from max_time
-
-        // let core_id = self.config.affinity;
-
-        // match unsafe { nix::unistd::fork() } {
-        //     Ok(ForkResult::Parent { child: _, .. }) => {
-        //         // parent
-        //         let _status = 0;
-        //     }
-        //     Ok(ForkResult::Child) => {
-        //         setrlimit(
-        //             Resource::RLIMIT_CPU,
-        //             (_max_time as f64 * self.config.cpu_scale).ceil() as rlim_t,
-        //             (_max_time as f64 * self.config.cpu_scale).ceil() as rlim_t + 10,
-        //         )?;
-
-        //         unsafe {
-        //             use caps::{CapSet, Capability};
-
-        //             caps::has_cap(None, CapSet::Permitted, Capability::CAP_SYS_RESOURCE).and_then(
-        //                 |_| caps::drop(None, CapSet::Effective, Capability::CAP_SYS_RESOURCE),
-        //             );
-        //             caps::has_cap(None, CapSet::Permitted, Capability::CAP_SETPCAP)
-
-        //             let cpuset = [core_id as libc::cpu_set_t];
-        //             libc::sched_setaffinity(0, 1, &cpuset);
-
-        //             let args = [CStr::from_ptr(std::ptr::null()); 0];
-
-        //             execve(
-        //                 CStr::from_bytes_with_nul_unchecked(b"/bin/sleep\0"),
-        //                 &args,
-        //                 &args,
-        //             );
-        //         }
-        //     }
-
-        //     _ => {}
-        // }
 
         Ok(result_form)
     }

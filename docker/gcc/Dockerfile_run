@@ -1,3 +1,6 @@
 from gcc:13
 
-entrypoint ["/judge/answer"]
+WORKDIR /judge/
+RUN apt-get update && apt-get install -y apt-transport-https
+RUN apt-get install time
+entrypoint ["/bin/bash", "-c", "/bin/time -o /judge/output_time -f \"%e %M\" /judge/answer < /judge/input > /judge/output_run"]

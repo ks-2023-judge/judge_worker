@@ -1,3 +1,6 @@
 from node:20
 
-entrypoint ["node", "--stack-size=65536", "/judge/Answer.js"]
+WORKDIR /judge/
+RUN apt-get update && apt-get install -y apt-transport-https
+RUN apt-get install time
+entrypoint ["/bin/bash", "-c", "/bin/time -o /judge/output_time -f \"%e %M\" node --stack-size=65536 /judge/Answer.js < /judge/input > /judge/output_run"]
