@@ -188,8 +188,8 @@ impl Core {
         std::fs::create_dir(&dir_target).unwrap();
 
         let file_target = match lang {
-            SubmissionLanguage::C => "Answer.c",
-            SubmissionLanguage::Cpp => "Answer.cpp",
+            SubmissionLanguage::C => "answer.c",
+            SubmissionLanguage::Cpp => "answer.cpp",
             SubmissionLanguage::Java => "Answer.java",
             SubmissionLanguage::Python => "Answer.py",
             SubmissionLanguage::Rust => "Answer.rs",
@@ -388,6 +388,13 @@ impl Core {
         if result_form.time_used > max_time {
             result_form.result = TestCaseJudgeResultInner::TimeLimitExceeded;
             return Ok(result_form);
+        }
+
+        if result_form.output_run.ends_with('\n') {
+            result_form.output_run.pop();
+        }
+        if expect_output.ends_with('\n') {
+            result_form.output_run.pop();
         }
 
         if result_form.output_run != expect_output {
