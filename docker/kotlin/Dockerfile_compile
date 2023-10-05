@@ -7,4 +7,4 @@ RUN wget -O /tmp/kotlinc.zip https://github.com/JetBrains/kotlin/releases/downlo
 RUN unzip -d /tmp/kotlinc/ /tmp/kotlinc.zip
 ENV PATH="$PATH:/tmp/kotlinc/:/tmp/kotlinc/bin/"
 
-entrypoint ["kotlinc-jvm", "-J-Xms1024m", "-J-Xmx1920m", "-J-Xss512m", "-include-runtime", "-d /judge/Answer.jar", "/judge/Answer.java"]
+entrypoint ["kotlinc-jvm", "-J-Xms1024m", "-J-Xmx1920m", "-J-Xss512m", "-include-runtime", "-d /judge/Answer.jar", "/judge/Answer.kt"]

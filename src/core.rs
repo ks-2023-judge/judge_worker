@@ -172,7 +172,7 @@ impl Core {
         lang: SubmissionLanguage,
         code: String,
         input: String,
-        expect_output: String,
+        mut expect_output: String,
         max_time: u64,
         max_memory: u64,
         is_decimal_mode: bool,
@@ -198,6 +198,7 @@ impl Core {
             SubmissionLanguage::Python => "Answer.py",
             SubmissionLanguage::Rust => "Answer.rs",
             SubmissionLanguage::Javascript => "Answer.js",
+            SubmissionLanguage::Kotlin => "Answer.kt",
         };
         let file_target = format!("{}/{}", dir_target, file_target);
 
@@ -370,6 +371,7 @@ impl Core {
                 String::from("ASCII / UTF-8이 아닌 문자열이 포함되어 있습니다.")
             };
 
+        println!("output_run: {:?}", output_run);
         result_form.output_run = output_run;
 
         match exit_status {
@@ -398,7 +400,7 @@ impl Core {
             result_form.output_run.pop();
         }
         if expect_output.ends_with('\n') {
-            result_form.output_run.pop();
+            expect_output.pop();
         }
 
         if is_decimal_mode {
@@ -458,6 +460,13 @@ fn diff_decimal(output: &String, output_expect: &String) -> bool {
                 }
                 if e_s[1].len() < 6 {
                     e_s[1] = format!("{:0<6}", e_s[1]);
+                }
+
+                if e_s[1].len() > 6 {
+                    e_s[1] = e_s[1][0..6].to_string();
+                }
+                if o_s[1].len() > 6 {
+                    o_s[1] = o_s[1][0..6].to_string();
                 }
 
                 if o_s[1] != e_s[1] {
