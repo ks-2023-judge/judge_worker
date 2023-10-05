@@ -154,7 +154,7 @@ pub enum SubmissionLanguage {
     C,
     Cpp,
     Java,
-    Koltin,
+    Kotlin,
     Python,
     Rust,
     Javascript,
@@ -169,7 +169,7 @@ impl TryFrom<Value> for SubmissionLanguage {
             "c" => Ok(SubmissionLanguage::C),
             "cpp" => Ok(SubmissionLanguage::Cpp),
             "java" => Ok(SubmissionLanguage::Java),
-            "kotlin" => Ok(SubmissionLanguage::Koltin),
+            "kotlin" => Ok(SubmissionLanguage::Kotlin),
             "python" => Ok(SubmissionLanguage::Python),
             "rust" => Ok(SubmissionLanguage::Rust),
             "javascript" => Ok(SubmissionLanguage::Javascript),
@@ -191,7 +191,7 @@ impl TryFrom<String> for SubmissionLanguage {
             "python" => Ok(SubmissionLanguage::Python),
             "rust" => Ok(SubmissionLanguage::Rust),
             "javascript" => Ok(SubmissionLanguage::Javascript),
-            "kotlin" => Ok(SubmissionLanguage::Koltin),
+            "kotlin" => Ok(SubmissionLanguage::Kotlin),
             _ => Err(()),
         }
     }
@@ -205,7 +205,7 @@ impl From<SubmissionLanguage> for String {
             SubmissionLanguage::Python => "python".to_string(),
             SubmissionLanguage::Rust => "rust".to_string(),
             SubmissionLanguage::Javascript => "javascript".to_string(),
-            SubmissionLanguage::Koltin => "kotlin".to_string(),
+            SubmissionLanguage::Kotlin => "kotlin".to_string(),
         }
     }
 }
