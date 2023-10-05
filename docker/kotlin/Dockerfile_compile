@@ -4,7 +4,7 @@ RUN microdnf install -y wget unzip
 
 RUN mkdir /tmp/kotlinc
 RUN wget -O /tmp/kotlinc.zip https://github.com/JetBrains/kotlin/releases/download/v1.9.10/kotlin-compiler-1.9.10.zip
-RUN unzip -d /tmp/kotlinc/ /tmp/kotlinc.zip
+RUN unzip -d /tmp/ /tmp/kotlinc.zip
 ENV PATH="$PATH:/tmp/kotlinc/:/tmp/kotlinc/bin/"
 
-entrypoint ["kotlinc-jvm", "-J-Xms1024m", "-J-Xmx1920m", "-J-Xss512m", "-include-runtime", "-d /judge/Answer.jar", "/judge/Answer.kt"]
+entrypoint ["kotlinc-jvm", "-J-Xms1024m", "-J-Xmx1920m", "-J-Xss512m", "-include-runtime", "-d", "/judge/Answer.jar", "/judge/Answer.kt"]
