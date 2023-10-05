@@ -77,6 +77,8 @@ impl Core {
                     expect_output,
                     time_limit,
                     memory_limit,
+
+                    is_decimal_mode,
                     ..
                 } = msg;
 
@@ -121,6 +123,7 @@ impl Core {
                         expect_output,
                         time_limit,
                         memory_limit,
+                        is_decimal_mode,
                     ),
                 )
                 .await;
@@ -172,6 +175,7 @@ impl Core {
         expect_output: String,
         max_time: u64,
         max_memory: u64,
+        is_decimal_mode: bool,
     ) -> Result<MsgResult, Errno> {
         // result_form.result = TestCaseJudgeResultInner::CompileFailed;
 
@@ -397,7 +401,12 @@ impl Core {
             result_form.output_run.pop();
         }
 
-        if result_form.output_run != expect_output {
+        if is_decimal_mode {
+            if !diff_decimal(&result_form.output_run, &expect_output) {
+                result_form.result = TestCaseJudgeResultInner::WrongAnswer;
+                return Ok(result_form);
+            }
+        } else if result_form.output_run != expect_output {
             result_form.result = TestCaseJudgeResultInner::WrongAnswer;
             return Ok(result_form);
         }
@@ -416,5 +425,47 @@ where
         b
     } else {
         a
+    }
+}
+
+fn diff_decimal(output: &String, output_expect: &String) -> bool {
+    let mut iter = output.split(&[' ', '\n']);
+    let mut iter_expect = output_expect.split(&[' ', '\n']);
+
+    loop {
+        match (iter.next(), iter_expect.next()) {
+            (Some(o), Some(e)) => {
+                let mut o_s = o.split('.').map(|s| s.to_string()).collect::<Vec<_>>();
+                let mut e_s = e.split('.').map(|s| s.to_string()).collect::<Vec<_>>();
+
+                if o_s.len() > 2 || e_s.len() > 2 {
+                    return false;
+                }
+
+                if o_s.len() == 1 {
+                    o_s.push("0".to_string());
+                }
+                if e_s.len() == 1 {
+                    e_s.push("0".to_string());
+                }
+
+                if o_s[0] != e_s[0] {
+                    return false;
+                }
+
+                if o_s[1].len() < 6 {
+                    o_s[1] = format!("{:0<6}", o_s[1]);
+                }
+                if e_s[1].len() < 6 {
+                    e_s[1] = format!("{:0<6}", e_s[1]);
+                }
+
+                if o_s[1] != e_s[1] {
+                    return false;
+                }
+            }
+            (None, None) => return true,
+            _ => return false,
+        }
     }
 }
